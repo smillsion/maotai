@@ -21,12 +21,11 @@ from notify import send
 
 p_c_map = {}
 mt_r = 'clips_OlU6TmFRag5rCXwbNAQ/Tz1SKlN8THcecBp/'
-# 下面定义的是申请哪几个，可通过iMT_Products环境变量来设置，比如{"10941": "贵州茅台酒（甲辰龙年）", "2478": "贵州茅台酒（珍品）", "10942": "贵州茅台酒（甲辰龙年）x2"}
-#res_map = json.loads(os.getenv('iMT_Products', ''))
-#if not res_map:
-#    res_map = {"10941": "贵州茅台酒（甲辰龙年）", "10942": "贵州茅台酒（甲辰龙年）x2"}
-res_map = {"10941": "贵州茅台酒（甲辰龙年）", "10942": "贵州茅台酒（甲辰龙年）x2"}
-print(res_map)
+# res_map = {'10213': '贵州茅台酒（癸卯兔年）', '2476': '贵州茅台酒（壬寅虎年）', '2478': '贵州茅台酒（珍品）',
+# '10214': '贵州茅台酒（癸卯兔年）x2'}
+# 下面定义的是申请哪几个，想申请全部的话把上面注释删掉，把下面的注释掉
+res_map = {'10941': '贵州茅台酒（甲辰龙年）','10942': '贵州茅台酒（甲辰龙年）x2'}
+
 
 def mt_add(itemId, shopId, sessionId, userId, token, Device_ID):
     MT_K = f'{int(time.time() * 1000)}'
@@ -255,6 +254,48 @@ def login(phone, vCode, Device_ID):
     print(Device_ID, token, cookie)
     return Device_ID, token, cookie
 
+def pushMsg(mt_bark_server, mt_bark_key, s, userName, mobile):
+    try:
+        mt_fail_only = os.getenv("MT_BARK_FAIL_ONLY")
+        title = "申购成功"
+        msg = "申购成功"
+        user = ""
+
+        if '失败' in s:
+            title = "申购失败"
+            msg = "申购失败"
+        elif '失效' in s:
+            title = "申购失败"
+            msg = '注意！Token失效，请重新登陆！'
+
+        if userName and mobile:
+            user = f"{userName}_{mobile}"
+
+        if mt_fail_only == "true" and title != "申购失败":
+            return
+        
+        payload = {
+            "body": msg,
+            "device_key": mt_bark_key,
+            "title": f"{user}{title}",
+            "badge": 1,
+            "icon": "https://resource.moutai519.com.cn/mt-resource/static-union/1650339161fbd333.png",
+            "url": "https://apps.apple.com/cn/app/i%E8%8C%85%E5%8F%B0/id1600482450"
+        }
+
+        response = requests.post(
+            url=f"{mt_bark_server}/push",
+            headers={"Content-Type": "application/json; charset=utf-8"},
+            data=json.dumps(payload)
+        )
+
+        # 如果需要，你可以打印 HTTP 状态码和响应体
+        # print('Response HTTP Status Code:', response.status_code)
+        # print('Response HTTP Response Body:', response.content)
+
+    except requests.exceptions.RequestException as e:
+        print(f'HTTP Request failed: {e}')
+
 
 if __name__ == '__main__':
     mt_tokens = os.getenv("MTTokenD")
@@ -269,6 +310,10 @@ if __name__ == '__main__':
     s = "-------------------总共" + \
         str(int(len(mt_token_list))) + \
         "个用户-------------------"+'\n'
+    mt_bark_server = os.getenv("MT_BARK_SERVER")
+    mt_bark_key = os.getenv("MT_BARK_KEY")
+    # server_check = False;
+    # key_check = False;
     userCount = 0
     if len(mt_token_list) > 0:
         for mt_token in mt_token_list:
@@ -311,4 +356,13 @@ if __name__ == '__main__':
                 s += userName + '_' + mobile + "正常结束任务"+'\n              \n'
             except Exception as e:
                 s += userName + '_' + mobile + "异常信息"+e
+        
+        # if not mt_bark_server and not server_check:
+        #     server_check = True;
+        #     s += 'MT_BARK_SERVER 未配置\n' 
+        # if not mt_bark_key and not key_check:
+        #     key_check = True;
+        #     s += 'MT_BARK_KEY 未配置\n'
+        if mt_bark_server and mt_bark_key:
+            pushMsg(mt_bark_server, mt_bark_key, s, userName, mobile);
     send("i茅台申购+小茅运", s)
